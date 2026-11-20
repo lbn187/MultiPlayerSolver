@@ -1,10 +1,3 @@
-"""Resolve one subgame of n-player Kuhn and one of three-player Leduc.
-
-Small iteration counts keep the run near a minute; raise ``--iters`` for
-tighter blueprints.
-
-    python3 examples/nplayer_and_leduc.py [--kuhn-iters 120] [--leduc-iters 10]
-"""
 from __future__ import annotations
 
 import argparse
@@ -17,7 +10,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import lbn_mpsafe as M
 
 TOL = 0.02
-
 
 def second_round_public_states(root):
     out = set()
@@ -34,7 +26,6 @@ def second_round_public_states(root):
     walk(root)
     return sorted(out)
 
-
 def run_one(game, pub, resolver, bp, iters):
     t0 = time.time()
     res = M.resolve_subgame(game, pub, resolver, bp, iters=iters)
@@ -43,7 +34,6 @@ def run_one(game, pub, resolver, bp, iters):
     cert = M.gate(game, pub, resolver, bp, res["resolved"], tol=TOL)
     cert["seconds"] = time.time() - t0
     return cert
-
 
 def tree_size(game):
     dec = [0]
@@ -60,7 +50,6 @@ def tree_size(game):
 
     walk(game.root)
     return dec[0], len(infosets)
-
 
 def main():
     ap = argparse.ArgumentParser()
@@ -104,7 +93,6 @@ def main():
               "%s  (%.1fs)" %
               (pub, cert["dgul"], cert["B_dir"], cert["B_cache"],
                "played" if cert["accept"] else "rejected", cert["seconds"]))
-
 
 if __name__ == "__main__":
     main()

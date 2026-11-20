@@ -1,16 +1,3 @@
-"""Resolve every public subgame of three-player Kuhn poker and gate it.
-
-Blueprint: CFR on the full game.  For each public state and each resolver we
-run the multiplayer resolving gadget, measure the delivered update, evaluate
-the certificate, and apply the gate at tolerance 0.02.
-
-Prints one row per (public state, resolver) and a summary:
-  harmful   updates whose best-response gap rises by more than the tolerance,
-  blocked   harmful updates the gate rejects,
-  worst     the largest gap increase among the updates the gate plays.
-
-    python3 examples/kuhn3_gate.py [--iters 200]
-"""
 from __future__ import annotations
 
 import argparse
@@ -22,7 +9,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import lbn_mpsafe as M
 
 TOL = 0.02
-
 
 def public_states(root):
     out = set()
@@ -38,7 +24,6 @@ def public_states(root):
 
     walk(root)
     return sorted(out)
-
 
 def main():
     ap = argparse.ArgumentParser()
@@ -76,7 +61,6 @@ def main():
           (max([c["dgul"] for c in played], default=0.0)))
     print("covers (dGap <= B_cache): %d/%d" %
           (sum(1 for c in rows if c["covers"]), len(rows)))
-
 
 if __name__ == "__main__":
     main()

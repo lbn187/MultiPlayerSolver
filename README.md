@@ -71,6 +71,32 @@ covers (dGap <= B_cache): 33/33
 Ten of the 33 resolves raise the gap by more than the tolerance, the gate
 rejects all ten, and no played update exceeds the tolerance.
 
+## How it works
+
+A game is a tree of plain dicts. A chance node is `{"kind": "C", "probs": [...], "children": [...]}`,
+a decision node is `{"kind": "D", "player": p, "infoset": key, "actions": [...], "children": [...]}`,
+a terminal is `{"kind": "T", "payoff": array of n payoffs}`, and a frozen node plays a fixed
+policy. A strategy is a dict from information-set key to action probabilities. Keys read
+`P{player}|{private card}|{public history}`.
+
+**Resolve.** For a public state `pub` and a resolver `i`, the gadget re-solves the subgame.
+Its root chance enters each entry history with weight proportional to the chance reach times
+the resolver's blueprint reach, `c_e * pi_i(bp)`. At an opponent entry information set the
+opponent may Terminate, which pays the blueprint counterfactual value and keeps playing the
+blueprint, or Follow, which lets the opponent play the subgame freely. CFR runs on the gadget,
+and only the resolver's subgame information sets are spliced back into the blueprint.
+
+**Certify.** For each opponent entry information set, the BR-certified margin is the blueprint
+counterfactual value minus the opponent's exact subgame best-response value, divided by the
+entry mass, `m_hat = CFV - SBV / W`. The margin deficit aggregates the negative parts,
+`M_j = sum W * max(0, -m_hat)`. The activation term `A_i^S` is the payoff the blueprint promised
+the resolver but never realized, measured by one best response of the resolver against the
+blueprint opponents inside the subgame.
+
+`B_dir` and `B_cache` combine these with the realized payoff changes `g_p` and the blueprint
+best-response gains `A0_p`. Both bound the gap increase of the delivered update, and `B_cache`
+is never larger than `B_dir`.
+
 ## Games
 
 | builder | game |

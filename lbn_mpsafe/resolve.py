@@ -1,26 +1,3 @@
-"""Generalized (multiplayer) safe re-solving gadget, CFR-D style.
-
-For a subgame identified by a public history `pub`, and a designated resolver
-player p:
-  * gadget root chance distributes entering histories with weight
-    pi_chance * pi_p^blueprint  (opponent reaches EXCLUDED -> robust /
-    maxmargin-style entry: opponents may enter with any private state).
-  * each opponent j, at their root infoset (private_j, pub), chooses
-    T(erminate): receive their blueprint counterfactual value CFV_j and play
-    blueprint inside the subgame (their in-subgame behavior still affects
-    OTHER players' payoffs), or F(ollow): play the subgame freely, receiving
-    the realized subgame payoff.
-  * the resolver re-solves their subgame strategy; opponents' subgame
-    strategies in F-branches are trainable (adversarial/self-interested).
-All players run CFR simultaneously on the gadget game.
-
-Design note (the conceptual crux for n>2): a single gadget chance cannot
-exclude EVERY opponent's own reach for their own counterfactual entry while
-including it for the beliefs of the other opponent. We exclude all opponent
-reaches from chance (robust choice) and give blueprint-CFV terminate values
-weighted by pi_{-j}. This is exactly where polymatrix coupling enters: one
-opponent's entry decision changes the other's follow-value.
-"""
 from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple
@@ -31,15 +8,8 @@ from .efg import (CFRTrainer, Strategy, chance_node, collect_infosets,
                  decision_node, expected_utility, frozen_node, terminal_node)
 from .games import Game
 
-
-# ---------------------------------------------------------------------------
 def find_subgame_entries(game: Game, pub: str, sigma: Strategy
                          ) -> List[dict]:
-    """All earliest nodes with node['pub'] == pub, with per-player reach.
-
-    Returns list of {"deal": d_idx, "privates": tuple, "node": nd,
-                     "chance": float, "reach": np.ndarray(n)}.
-    """
     out: List[dict] = []
 
     def down(nd: dict, reach: np.ndarray, ch: float, d_idx: int,
@@ -66,14 +36,8 @@ def find_subgame_entries(game: Game, pub: str, sigma: Strategy
         down(sub, np.ones(game.n_players), prob, d_idx, privs)
     return out
 
-
 def blueprint_cfvs(game: Game, entries: List[dict], sigma: Strategy
                    ) -> Tuple[Dict[str, float], Dict[str, bool]]:
-    """CFV_j at each opponent-root infoset key G{j}|{priv}|{pub}.
-
-    CFV_j(I) = sum_h pi_c(h) pi_{-j}(h) EV_j^bp(h) / sum_h pi_c(h) pi_{-j}(h)
-    Returns (cfv dict, zero_denominator flag dict).
-    """
     n = game.n_players
     num: Dict[str, float] = {}
     den: Dict[str, float] = {}
@@ -97,8 +61,6 @@ def blueprint_cfvs(game: Game, entries: List[dict], sigma: Strategy
             zflag[key] = True
     return cfv, zflag
 
-
-# ---------------------------------------------------------------------------
 def _copy_subgame(nd: dict, resolver: int, flags: Dict[int, str],
                   cfv_of: Dict[int, float], blueprint: Strategy) -> dict:
     if nd["kind"] == "T":
@@ -119,10 +81,8 @@ def _copy_subgame(nd: dict, resolver: int, flags: Dict[int, str],
                            blueprint[nd["infoset"]], kids)
     return decision_node(pl, nd["infoset"], nd["actions"], kids)
 
-
 def build_gadget(game: Game, pub: str, resolver: int, blueprint: Strategy
                  ) -> Optional[dict]:
-    """Build gadget game. Returns dict with root/entries/cfv info or None."""
     n = game.n_players
     entries = find_subgame_entries(game, pub, blueprint)
     if not entries:
@@ -155,11 +115,8 @@ def build_gadget(game: Game, pub: str, resolver: int, blueprint: Strategy
     return {"root": root, "entries": entries, "cfv": cfv, "zflag": zflag,
             "opps": opps, "pub": pub, "resolver": resolver}
 
-
-# ---------------------------------------------------------------------------
 def cf_action_values(root: dict, sigma: Strategy, target: str, n: int
                      ) -> Optional[np.ndarray]:
-    """Counterfactual action values (owner's coordinate) at infoset target."""
     found: List[Tuple[dict, float]] = []
 
     def down(nd: dict, pi_minus: float, pl_target: List[int]) -> None:
@@ -193,10 +150,8 @@ def cf_action_values(root: dict, sigma: Strategy, target: str, n: int
         return None
     return vals / den
 
-
 def resolve_subgame(game: Game, pub: str, resolver: int, blueprint: Strategy,
                     iters: int = 4000) -> Optional[dict]:
-    """Run gadget CFR; return resolved profile, margins, diagnostics."""
     gad = build_gadget(game, pub, resolver, blueprint)
     if gad is None:
         return None
@@ -204,7 +159,6 @@ def resolve_subgame(game: Game, pub: str, resolver: int, blueprint: Strategy,
     trainer.run(iters)
     sg = trainer.average_strategy()
 
-    # margins: v(T) - v(F) at each opponent gadget infoset
     margins: Dict[str, float] = {}
     ginfo = collect_infosets(gad["root"])
     for I in ginfo:
@@ -213,7 +167,6 @@ def resolve_subgame(game: Game, pub: str, resolver: int, blueprint: Strategy,
             if v is not None:
                 margins[I] = float(v[0] - v[1])
 
-    # splice: resolver's subgame infosets only
     orig_info = collect_infosets(game.root)
     resolved = {k: v.copy() for k, v in blueprint.items()}
     n_spliced = 0
@@ -224,15 +177,9 @@ def resolve_subgame(game: Game, pub: str, resolver: int, blueprint: Strategy,
     return {"resolved": resolved, "margins": margins, "gadget": gad,
             "n_spliced": n_spliced, "cfv": gad["cfv"], "zflag": gad["zflag"]}
 
-
-# ---------------------------------------------------------------------------
 def vul_paper_est(root: dict, sigma: Strategy, i: int, n: int,
                   restarts: int = 4, rounds: int = 10,
                   seed: int = 0) -> float:
-    """Paper-style vulnerability (Def 3.2), S'_{-i}=S_{-i}:
-    u_i(sigma) - min_{s_{-i}} u_i(sigma_i, s_{-i}),
-    estimated by alternating exact BR minimization with random restarts
-    (a LOWER bound on the true vulnerability)."""
     from .efg import best_response
     rng = np.random.default_rng(seed)
     info = collect_infosets(root)
@@ -241,7 +188,7 @@ def vul_paper_est(root: dict, sigma: Strategy, i: int, n: int,
     best_min = np.inf
     for r in range(restarts):
         cur = {k: v.copy() for k, v in sigma.items()}
-        if r > 0:  # random pure init for opponents
+        if r > 0:
             for I, (pl, na) in info.items():
                 if pl in opps:
                     v = np.zeros(na)

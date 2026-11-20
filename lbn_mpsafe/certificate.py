@@ -1,24 +1,3 @@
-"""Post-hoc safety certificate for a multiplayer subgame resolve.
-
-For a blueprint ``bp``, a public state ``pub`` and a resolver ``i``, a
-resolve delivers a profile ``resolved`` that changes only ``i``'s strategy
-inside the subgame.  This module measures the delivered update and evaluates
-the two computable bounds of the paper:
-
-    B_dir   = max(-g_i, max_{j != i} [M_j - g_j])
-    B_cache = max(A0_i - g_i, max_{j != i} [A0_j + M_j - g_j]) - max_p A0_p
-
-with
-
-    A_p      the best-response gain of player p under a profile,
-    g_p      the realized payoff change of p caused by the update,
-    A0_p     the best-response gain of p under the blueprint,
-    M_j      the mass-weighted margin deficit of opponent j.
-
-Both bounds satisfy  Gap(resolved) - Gap(bp) <= B_cache <= B_dir, where
-Gap = max_p A_p.  The gate plays the update when the bound is within a
-tolerance and keeps the blueprint otherwise.
-"""
 from __future__ import annotations
 
 from typing import Dict, List, Tuple
@@ -30,22 +9,16 @@ from .efg import (Strategy, best_response, chance_node, collect_infosets,
 from .games import Game
 from .resolve import blueprint_cfvs, find_subgame_entries
 
-
 def player_gains(game: Game, sigma: Strategy) -> np.ndarray:
-    """Best-response gain A_p of every player under ``sigma``."""
     n = game.n_players
     return np.array([best_response(game.root, sigma, p, n)[0]
                      - expected_utility(game.root, sigma)[p]
                      for p in range(n)])
 
-
 def gap(game: Game, sigma: Strategy) -> float:
-    """Best-response gap: the largest gain any single player can obtain."""
     return float(player_gains(game, sigma).max())
 
-
 def subgame_infosets(game: Game, pub: str, player: int) -> List[str]:
-    """Information sets of ``player`` inside the subgame at ``pub``."""
     info = collect_infosets(game.root)
     uni = {I: np.ones(na) / na for I, (_, na) in info.items()}
     keys = set()
@@ -55,15 +28,8 @@ def subgame_infosets(game: Game, pub: str, player: int) -> List[str]:
                 keys.add(I)
     return sorted(keys)
 
-
 def br_margins(game: Game, pub: str, resolver: int, bp: Strategy,
                resolved: Strategy) -> Dict[str, float]:
-    """BR-certified margin m_hat at every opponent entry information set.
-
-    The Follow branch is valued by an exact subgame best response of the
-    opponent against (resolved_i, bp_{-ij}), weighted by the counterfactual
-    entry mass c_e * pi_{-j}^{bp}(e).
-    """
     n = game.n_players
     entries = find_subgame_entries(game, pub, bp)
     if not entries:
@@ -89,10 +55,8 @@ def br_margins(game: Game, pub: str, resolver: int, bp: Strategy,
         out[key] = float(cfv[key] - sbv)
     return out
 
-
 def margin_deficits(game: Game, pub: str, resolver: int, bp: Strategy,
                     resolved: Strategy) -> Dict[str, float]:
-    """Mass-weighted margin deficit M_j of every opponent."""
     n = game.n_players
     entries = find_subgame_entries(game, pub, bp)
     m_hat = br_margins(game, pub, resolver, bp, resolved)
@@ -110,16 +74,13 @@ def margin_deficits(game: Game, pub: str, resolver: int, bp: Strategy,
         out[j] = out.get(j, 0.0) + mass[key] * max(0.0, -m)
     return {str(j): float(v) for j, v in sorted(out.items())}
 
-
 def activation_term(game: Game, pub: str, resolver: int,
                     bp: Strategy) -> float:
-    """A_i^S(bp): the subgame payoff the blueprint promises but never realizes."""
     n = game.n_players
     s_set = set(subgame_infosets(game, pub, resolver))
     frozen_root = _freeze_outside(game.root, resolver, s_set, bp)
     val, _ = best_response(frozen_root, bp, resolver, n)
     return float(val - expected_utility(game.root, bp)[resolver])
-
 
 def _freeze_outside(nd: dict, player: int, s_set: set,
                     sigma: Strategy) -> dict:
@@ -135,15 +96,8 @@ def _freeze_outside(nd: dict, player: int, s_set: set,
                            sigma[nd["infoset"]], kids)
     return decision_node(nd["player"], nd["infoset"], nd["actions"], kids)
 
-
 def certificate(game: Game, pub: str, resolver: int, bp: Strategy,
                 resolved: Strategy) -> dict:
-    """Evaluate one delivered update.
-
-    Returns the measured gap change, the certificate quantities, and the two
-    bounds.  ``covers`` says whether the cached bound covers the true change
-    to within ``tol``.
-    """
     a0 = player_gains(game, bp)
     a1 = player_gains(game, resolved)
     u0 = expected_utility(game.root, bp)
@@ -164,10 +118,8 @@ def certificate(game: Game, pub: str, resolver: int, bp: Strategy,
             "covers": bool(dvul <= b_cache + 1e-9),
             "harmful": bool(dvul > 0.02)}
 
-
 def gate(game: Game, pub: str, resolver: int, bp: Strategy,
          resolved: Strategy, tol: float = 0.02) -> dict:
-    """Play the update when the certificate is within ``tol``, else keep bp."""
     cert = certificate(game, pub, resolver, bp, resolved)
     cert["accept"] = bool(cert["B_cache"] <= tol)
     cert["played"] = resolved if cert["accept"] else bp

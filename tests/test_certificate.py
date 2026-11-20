@@ -1,4 +1,3 @@
-"""Checks that the certificate behaves as the theorem says on three-player Kuhn."""
 import os
 import sys
 
@@ -10,13 +9,11 @@ import lbn_mpsafe as M
 
 TOL = 0.02
 
-
 def _setup(iters=150):
     game = M.build_kuhn3()
     trainer = M.CFRTrainer(game.root, game.n_players)
     trainer.run(iters)
     return game, trainer.average_strategy()
-
 
 def _updates(game, bp, iters=150, pubs=("b", "bf", "kb")):
     for pub in pubs:
@@ -24,7 +21,6 @@ def _updates(game, bp, iters=150, pubs=("b", "bf", "kb")):
             res = M.resolve_subgame(game, pub, i, bp, iters=iters)
             if res is not None:
                 yield pub, i, res["resolved"]
-
 
 def test_bounds_are_ordered_and_cover():
     game, bp = _setup()
@@ -36,7 +32,6 @@ def test_bounds_are_ordered_and_cover():
         assert cert["dgul"] <= cert["B_cache"] + 1e-9, (pub, i, cert)
     assert seen > 0
 
-
 def test_gate_blocks_every_harmful_update():
     game, bp = _setup()
     for pub, i, resolved in _updates(game, bp):
@@ -45,7 +40,6 @@ def test_gate_blocks_every_harmful_update():
             assert cert["B_cache"] > TOL
         if cert["harmful"]:
             assert not cert["accept"], (pub, i, cert)
-
 
 def test_resolve_changes_only_the_resolver():
     game, bp = _setup()
@@ -58,9 +52,6 @@ def test_resolve_changes_only_the_resolver():
                 continue
             owner = info[key][0]
             assert owner == i, (key, owner, i)
-
-
-
 
 def _tree_size(game):
     dec = [0]
@@ -78,7 +69,6 @@ def _tree_size(game):
     walk(game.root)
     return dec[0], len(infosets)
 
-
 def test_game_family_sizes():
     assert _tree_size(M.build_kuhn(3)) == (288, 48)
     assert set(M.collect_infosets(M.build_kuhn(3).root)) == \
@@ -87,7 +77,6 @@ def test_game_family_sizes():
     assert _tree_size(M.build_kuhn(5)) == (57600, 480)
     assert _tree_size(M.build_kuhn(6)) == (967680, 1344)
     assert _tree_size(M.build_leduc3()) == (135288, 8406)
-
 
 def test_leduc_certificate_covers():
     game = M.build_leduc3()
@@ -109,7 +98,6 @@ def test_leduc_certificate_covers():
     cert = M.certificate(game, pub, 0, bp, res["resolved"])
     assert cert["B_cache"] <= cert["B_dir"] + 1e-9
     assert cert["covers"]
-
 
 if __name__ == "__main__":
     for fn in (test_bounds_are_ordered_and_cover,

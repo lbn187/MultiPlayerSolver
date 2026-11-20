@@ -1,16 +1,3 @@
-"""Generic extensive-form game (EFG) utilities.
-
-Tree nodes are lightweight dicts:
-  chance   : {"kind": "C", "probs": [...], "children": [...]}
-  decision : {"kind": "D", "player": i, "infoset": str,
-              "actions": [...], "children": [...]}
-  frozen   : {"kind": "F", "player": i, "infoset": str,
-              "probs": [...], "children": [...]}   # plays a FIXED policy
-  terminal : {"kind": "T", "payoff": np.ndarray(n_players)}
-
-A strategy profile is a dict: infoset -> np.ndarray of action probs.
-All algorithms are exact full-tree walks (games here are tiny).
-"""
 from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple
@@ -19,29 +6,23 @@ import numpy as np
 
 Strategy = Dict[str, np.ndarray]
 
-
 def chance_node(probs: List[float], children: List[dict]) -> dict:
     return {"kind": "C", "probs": list(probs), "children": children}
-
 
 def decision_node(player: int, infoset: str, actions: List[str],
                   children: List[dict]) -> dict:
     return {"kind": "D", "player": player, "infoset": infoset,
             "actions": actions, "children": children}
 
-
 def frozen_node(player: int, infoset: str, probs: np.ndarray,
                 children: List[dict]) -> dict:
     return {"kind": "F", "player": player, "infoset": infoset,
             "probs": np.asarray(probs, dtype=float), "children": children}
 
-
 def terminal_node(payoff: np.ndarray) -> dict:
     return {"kind": "T", "payoff": np.asarray(payoff, dtype=float)}
 
-
 def collect_infosets(root: dict) -> Dict[str, Tuple[int, int]]:
-    """Return infoset -> (player, n_actions) for all decision nodes."""
     out: Dict[str, Tuple[int, int]] = {}
     stack = [root]
     while stack:
@@ -52,13 +33,10 @@ def collect_infosets(root: dict) -> Dict[str, Tuple[int, int]]:
             stack.extend(nd["children"])
     return out
 
-
 def uniform_strategy(root: dict) -> Strategy:
     return {I: np.ones(na) / na for I, (_, na) in collect_infosets(root).items()}
 
-
 def expected_utility(root: dict, sigma: Strategy) -> np.ndarray:
-    """Exact expected payoff vector under profile sigma."""
     if root["kind"] == "T":
         return root["payoff"]
     if root["kind"] == "C":
@@ -73,20 +51,11 @@ def expected_utility(root: dict, sigma: Strategy) -> np.ndarray:
             continue
         v = expected_utility(ch, sigma)
         out = p * v if out is None else out + p * v
-    if out is None:  # degenerate; take first child
+    if out is None:
         out = expected_utility(root["children"][0], sigma)
     return out
 
-
-# ---------------------------------------------------------------------------
-# Vanilla CFR (multiplayer, regret matching, simultaneous updates)
-# ---------------------------------------------------------------------------
 class CFRTrainer:
-    """Vanilla CFR on an explicit tree. Works for n>=2 players.
-
-    For n>2 this converges to (approximate) CCE-like play; per-player
-    exploitability is measured separately.
-    """
 
     def __init__(self, root: dict, n_players: int) -> None:
         self.root = root
@@ -143,25 +112,11 @@ class CFRTrainer:
             out[I] = s / tot if tot > 0 else np.ones(len(s)) / len(s)
         return out
 
-
-# ---------------------------------------------------------------------------
-# Exact best response for one player, others fixed
-# ---------------------------------------------------------------------------
 def best_response(root: dict, sigma: Strategy, p: int, n_players: int,
                   minimize: bool = False, obj_player: Optional[int] = None
                   ) -> Tuple[float, Strategy]:
-    """Exact BR of player p to sigma_{-p} w.r.t. payoff coordinate obj_player
-    (defaults to p's own coordinate).
-
-    Returns (root value of coordinate obj under (br_p, sigma_{-p}), br strat).
-    If minimize=True, p picks actions to MINIMIZE the objective coordinate
-    (used for team-minimisation / paper-style vulnerability estimates).
-    Handles sequential own decisions by depth-ordered backward induction
-    over p's infosets (perfect recall assumed).
-    """
     obj = p if obj_player is None else obj_player
-    # Pass 1: annotate histories -> (node, pi_{-p}, own-depth) and group
-    # p's decision nodes by infoset with own action depth.
+
     entries: Dict[str, List[Tuple[dict, float]]] = {}
     depth_of: Dict[str, int] = {}
 
@@ -189,7 +144,6 @@ def best_response(root: dict, sigma: Strategy, p: int, n_players: int,
     choice: Dict[str, int] = {}
 
     def eval_p(nd: dict, forced: Optional[Tuple[dict, int]]) -> float:
-        """Objective coordinate value, using `choice` for decided infosets."""
         if nd["kind"] == "T":
             return float(nd["payoff"][obj])
         if nd["kind"] in ("C", "F"):
@@ -225,10 +179,8 @@ def best_response(root: dict, sigma: Strategy, p: int, n_players: int,
     val = expected_utility(root, full)[obj]
     return float(val), br
 
-
 def per_player_br_gain(root: dict, sigma: Strategy, n_players: int
                        ) -> np.ndarray:
-    """Task metric: Vul_i = max_{s_i'} u_i(s_i', sigma_{-i}) - u_i(sigma)."""
     base = expected_utility(root, sigma)
     out = np.zeros(n_players)
     for p in range(n_players):
