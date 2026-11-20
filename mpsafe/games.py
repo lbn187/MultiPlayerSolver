@@ -212,3 +212,184 @@ def eval_pure(game: Game, pure: List[Dict[str, int]]) -> np.ndarray:
             nd = nd["children"][a]
         out += prob * nd["payoff"]
     return out
+
+# ---------------------------------------------------------------------------
+# n-player Kuhn poker (n = 3 .. 6) and three-player Leduc poker
+# ---------------------------------------------------------------------------
+# Kuhn poker, n players: a deck of n+1 distinct cards gives one private card
+# to each player, every player antes 1, and one betting round allows at most
+# one bet of 1.  At n = 3 this matches build_kuhn3.
+#
+# Leduc poker, three players: a six-card deck holds two copies of each of
+# three ranks.  Every player antes 1 and receives one private card, a public
+# card is dealt from the three remaining cards, and two betting rounds use
+# bet sizes 2 and 4 with at most one raise per round.  At showdown a pair
+# with the public card beats any other hand, a higher private rank beats a
+# lower one, and equal hands split the pot.
+
+def _payoff_fold(contrib, folded, n):
+    alive = [p for p in range(n) if p not in folded]
+    pay = np.array([-float(c) for c in contrib])
+    pay[alive[0]] += float(sum(contrib))
+    return pay
+
+
+def _payoff_kuhn(cards, contrib, folded, n):
+    alive = [p for p in range(n) if p not in folded]
+    if len(alive) == 1:
+        return _payoff_fold(contrib, folded, n)
+    best = max(alive, key=lambda p: cards[p])
+    pay = np.array([-float(c) for c in contrib])
+    pay[best] += float(sum(contrib))
+    return pay
+
+
+def _payoff_leduc(cards, board, contrib, folded, n):
+    alive = [p for p in range(n) if p not in folded]
+    if len(alive) == 1:
+        return _payoff_fold(contrib, folded, n)
+    strength = [(1, cards[p]) if cards[p] == board else (0, cards[p])
+                for p in range(n)]
+    top = max(strength[p] for p in alive)
+    winners = [p for p in alive if strength[p] == top]
+    pay = np.array([-float(c) for c in contrib])
+    pot = float(sum(contrib))
+    for p in winners:
+        pay[p] += pot / len(winners)
+    return pay
+
+
+class _BettingGame:
+    """Shared betting engine: seat-ordered action, one raise per round.
+
+    ``pending`` lists the players who still owe an action in this round, in
+    the order they act.  A bet or raise puts every other live player back on
+    the list, starting from the seat after the bettor, which is the standard
+    poker order.
+    """
+
+    def __init__(self, n, cards, bet_sizes, max_bets, showdown, board=None,
+                 has_board=False):
+        self.has_board = has_board
+        self.n = n
+        self.cards = cards
+        self.bet_sizes = bet_sizes
+        self.max_bets = max_bets
+        self.showdown = showdown
+        self.board = board
+        self.infosets = set()
+
+    def _terminal(self, contrib, folded):
+        pay = self.showdown(self.cards, self.board, contrib, folded)
+        return terminal_node(pay)
+
+    def node(self, contrib, folded, pending, bets, rnd, hist):
+        n = self.n
+        actor = pending[0]
+        key = "P%d|%d|%s" % (actor, self.cards[actor], hist)
+        self.infosets.add(key)
+        to_call = max(contrib) - contrib[actor]
+        size = self.bet_sizes[rnd]
+        if to_call > 0:
+            acts = ["f", "c"] + (["r"] if bets < self.max_bets else [])
+        else:
+            acts = ["k"] + (["b"] if bets < self.max_bets else [])
+        kids = []
+        def advance(c2, f2, p2, b2, h2):
+            live2 = [p for p in range(n) if p not in f2]
+            if len(live2) == 1:
+                return self._terminal(c2, f2)
+            if p2:
+                return self.node(c2, f2, p2, b2, rnd, h2)
+            if rnd + 1 < len(self.bet_sizes):
+                return self._next_round(c2, f2, h2 + "|", rnd + 1)
+            return self._terminal(c2, f2)
+
+        for a in acts:
+            c2 = list(contrib)
+            f2 = set(folded)
+            h2 = hist + a
+            if a == "f":
+                f2.add(actor)
+                kids.append(advance(c2, f2, pending[1:], bets, h2))
+                continue
+            if a in ("b", "r"):
+                c2[actor] = max(c2) + size
+                live = [p for p in range(n) if p not in f2 and p != actor]
+                p2 = sorted(live, key=lambda p: (p - actor) % n)
+                kids.append(advance(c2, f2, p2, bets + 1, h2))
+                continue
+            if a == "c":
+                c2[actor] = max(c2)
+            kids.append(advance(c2, f2, pending[1:], bets, h2))
+        nd = decision_node(actor, key, acts, kids)
+        nd["pub"] = hist
+        return nd
+
+    def _first_actor(self, folded):
+        return min(p for p in range(self.n) if p not in folded)
+
+    def _next_round(self, contrib, folded, hist, rnd):
+        first = self._first_actor(folded)
+        pending = [p for p in range(self.n) if p not in folded and p >= first]
+        pending += [p for p in range(self.n) if p not in folded and p < first]
+        if not self.has_board:
+            return self.node(contrib, folded, pending, 0, rnd, hist)
+        deal = self._board_chance()
+        probs = [w for w, _ in deal]
+        kids = []
+        for _, b in deal:
+            g = _BettingGame(self.n, self.cards, self.bet_sizes,
+                             self.max_bets, self.showdown, b, True)
+            kids.append(g.node(contrib, folded, pending, 0, rnd, hist + str(b)))
+        return chance_node(probs, kids)
+
+    def _board_chance(self):
+        rest = [i for i in range(6) if i not in self.cards]
+        counts: Dict[int, int] = {}
+        for i in rest:
+            counts[i // 2] = counts.get(i // 2, 0) + 1
+        return [(c / len(rest), b) for b, c in sorted(counts.items())]
+
+
+def _pending_all(n, folded):
+    first = min(p for p in range(n) if p not in folded)
+    out = [p for p in range(n) if p not in folded and p >= first]
+    out += [p for p in range(n) if p not in folded and p < first]
+    return out
+
+
+def build_kuhn(n: int = 3, deck_size: Optional[int] = None) -> Game:
+    """n-player Kuhn poker: deck n+1, ante 1, one round, at most one bet of 1."""
+    if deck_size is None:
+        deck_size = n + 1
+    def showdown(cards, board, contrib, folded):
+        return _payoff_kuhn(cards, contrib, folded, n)
+    deals = list(itertools.permutations(range(deck_size), n))
+    prob = 1.0 / len(deals)
+    entries, children = [], []
+    for cards in deals:
+        g = _BettingGame(n, list(cards), [1], 1, showdown)
+        sub = g.node([1] * n, set(), _pending_all(n, set()), 0, 0, "")
+        entries.append((prob, tuple(cards), sub))
+        children.append(sub)
+    root = chance_node([prob] * len(deals), children)
+    root["pub"] = "<root>"
+    return Game("kuhn%d_d%d" % (n, deck_size), n, root, entries)
+
+
+def build_leduc3() -> Game:
+    """Three-player Leduc: deck of six cards (three ranks, two copies each)."""
+    def showdown(cards, board, contrib, folded):
+        return _payoff_leduc(cards, board, contrib, folded, 3)
+    deals = list(itertools.permutations(range(6), 3))
+    prob = 1.0 / len(deals)
+    entries, children = [], []
+    for cards in deals:
+        g = _BettingGame(3, list(cards), [2, 4], 2, showdown, None, True)
+        sub = g.node([1, 1, 1], set(), _pending_all(3, set()), 0, 0, "")
+        entries.append((prob, tuple(cards), sub))
+        children.append(sub)
+    root = chance_node([prob] * len(deals), children)
+    root["pub"] = "<root>"
+    return Game("leduc3", 3, root, entries)

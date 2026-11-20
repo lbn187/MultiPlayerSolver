@@ -60,9 +60,62 @@ def test_resolve_changes_only_the_resolver():
             assert owner == i, (key, owner, i)
 
 
+
+
+def _tree_size(game):
+    dec = [0]
+    infosets = set()
+
+    def walk(nd):
+        if nd["kind"] == "T":
+            return
+        if nd["kind"] == "D":
+            dec[0] += 1
+            infosets.add(nd["infoset"])
+        for c in nd["children"]:
+            walk(c)
+
+    walk(game.root)
+    return dec[0], len(infosets)
+
+
+def test_game_family_sizes():
+    assert _tree_size(M.build_kuhn(3)) == (288, 48)
+    assert set(M.collect_infosets(M.build_kuhn(3).root)) == \
+        set(M.collect_infosets(M.build_kuhn3().root))
+    assert _tree_size(M.build_kuhn(4)) == (3840, 160)
+    assert _tree_size(M.build_kuhn(5)) == (57600, 480)
+    assert _tree_size(M.build_kuhn(6)) == (967680, 1344)
+    assert _tree_size(M.build_leduc3()) == (135288, 8406)
+
+
+def test_leduc_certificate_covers():
+    game = M.build_leduc3()
+    bp = M.uniform_strategy(game.root)
+    pubs = set()
+
+    def walk(nd):
+        if nd["kind"] == "T":
+            return
+        if "|" in (nd.get("pub") or ""):
+            pubs.add(nd["pub"])
+        for c in nd["children"]:
+            walk(c)
+
+    walk(game.root)
+    pub = sorted(pubs)[0]
+    res = M.resolve_subgame(game, pub, 0, bp, iters=5)
+    assert res is not None
+    cert = M.certificate(game, pub, 0, bp, res["resolved"])
+    assert cert["B_cache"] <= cert["B_dir"] + 1e-9
+    assert cert["covers"]
+
+
 if __name__ == "__main__":
     for fn in (test_bounds_are_ordered_and_cover,
                test_gate_blocks_every_harmful_update,
-               test_resolve_changes_only_the_resolver):
+               test_resolve_changes_only_the_resolver,
+               test_game_family_sizes,
+               test_leduc_certificate_covers):
         fn()
         print("ok", fn.__name__)

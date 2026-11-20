@@ -72,11 +72,25 @@ covers (dGap <= B_cache): 33/33
 Ten of the 33 resolves raise the gap by more than the tolerance, the gate
 rejects all ten, and no played update exceeds the tolerance.
 
+## Games
+
+| builder | game | tree |
+|---|---|---|
+| `build_kuhn(n)` for `n = 3..6` | n-player Kuhn: deck of n+1 cards, one private card each, ante 1, one betting round with at most one bet of 1 | 288 / 3,840 / 57,600 / 967,680 decision nodes |
+| `build_kuhn3()` | three-player Kuhn with a four-card deck, the tree the paper's poker tables start from | 288 decision nodes, 48 information sets |
+| `build_leduc3()` | three-player Leduc: six-card deck with two copies of three ranks, ante 1, one private card each, a public card from the three remaining cards, betting rounds of 2 and 4 with at most one raise per round | 135,288 decision nodes, 8,406 information sets |
+
+A pair with the public card beats any other hand at a Leduc showdown, a higher private rank beats a lower one, and equal hands split the pot. `build_kuhn(3)` and `build_kuhn3()` produce the same tree.
+
+The paper reports 38,641 decision nodes and 1,134 information sets for its Leduc variant. The builder here follows the rule description above but is not a bit-exact copy of that implementation.
+
+Leduc is large enough that a full blueprint run takes time: ten CFR iterations on the full tree take about fifteen seconds on one core, and a second-round resolve about three.
+
 ## API
 
 | function | purpose |
 |---|---|
-| `build_kuhn3(deck_size=4)` | three-player Kuhn poker |
+| `build_kuhn(n)`, `build_kuhn3()`, `build_leduc3()` | game builders |
 | `CFRTrainer(root, n_players).run(iters)` | vanilla CFR, average strategy |
 | `resolve_subgame(game, pub, resolver, blueprint, iters)` | multiplayer gadget resolve |
 | `player_gains(game, sigma)` | best-response gain of every player |
@@ -103,12 +117,13 @@ values is outside its scope.
 ## Tests
 
 ```bash
-python3 tests/test_certificate.py
+python3 tests/test_certificate.py      # about half a minute
 ```
 
 The tests check that `B_cache <= B_dir`, that the certificate covers every
-delivered update, that the gate rejects every harmful update, and that a
-resolve changes only the resolver's strategy.
+delivered update, that the gate rejects every harmful update, that a resolve
+changes only the resolver's strategy, that the game builders produce the
+documented trees, and that the certificate covers a Leduc update.
 
 ## Citation
 
