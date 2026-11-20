@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lbn-mpsafe"
-version = "0.2.0"
+version = "0.3.0"
 description = "Safe subgame resolving in multiplayer imperfect-information games"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -13,3 +13,6 @@ dependencies = ["numpy>=1.21"]
 
 [tool.setuptools]
 packages = ["lbn_mpsafe"]
+
+[tool.setuptools.package-data]
+lbn_mpsafe = ["*.so"]

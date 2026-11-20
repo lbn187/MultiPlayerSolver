@@ -28,6 +28,12 @@ pip install -r requirements.txt
 
 Only `numpy` is required.
 
+The core modules `lbn_mpsafe.resolve` and `lbn_mpsafe.certificate` ship as
+compiled extensions for Linux x86_64 on CPython 3.10 and later. They need no
+compiler and their Python source is not part of this repository. Every function
+in the API section below is importable as documented, and the rest of the
+package is plain Python.
+
 ## Quickstart
 
 ```python
