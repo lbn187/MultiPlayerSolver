@@ -24,7 +24,6 @@ blueprint.
 
 ```bash
 pip install -r requirements.txt
-pip install -e .          # optional, makes `import lbn_mpsafe` work anywhere
 ```
 
 Only `numpy` is required.
@@ -74,11 +73,11 @@ rejects all ten, and no played update exceeds the tolerance.
 
 ## Games
 
-| builder | game | tree |
-|---|---|---|
-| `build_kuhn(n)` for `n = 3..6` | n-player Kuhn: deck of n+1 cards, one private card each, ante 1, one betting round with at most one bet of 1 | 288 / 3,840 / 57,600 / 967,680 decision nodes |
-| `build_kuhn3()` | three-player Kuhn with a four-card deck, the tree the paper's poker tables start from | 288 decision nodes, 48 information sets |
-| `build_leduc3()` | three-player Leduc: six-card deck with two copies of three ranks, ante 1, one private card each, a public card from the three remaining cards, betting rounds of 2 and 4 with at most one raise per round | 135,288 decision nodes, 8,406 information sets |
+| builder | game |
+|---|---|
+| `build_kuhn(n)` for `n = 3..6` | n-player Kuhn: deck of n+1 cards, one private card each, ante 1, one betting round with at most one bet of 1 |
+| `build_kuhn3()` | three-player Kuhn with a four-card deck, the tree the paper's poker tables start from |
+| `build_leduc3()` | three-player Leduc: six-card deck with two copies of three ranks, ante 1, one private card each, a public card from the three remaining cards, betting rounds of 2 and 4 with at most one raise per round |
 
 A pair with the public card beats any other hand at a Leduc showdown, a higher private rank beats a lower one, and equal hands split the pot.
 
