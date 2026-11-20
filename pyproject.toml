@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mpsafe"
+name = "lbn-mpsafe"
 version = "0.2.0"
 description = "Safe subgame resolving in multiplayer imperfect-information games"
 readme = "README.md"
@@ -12,4 +12,4 @@ license = { text = "MIT" }
 dependencies = ["numpy>=1.21"]
 
 [tool.setuptools]
-packages = ["mpsafe"]
+packages = ["lbn_mpsafe"]

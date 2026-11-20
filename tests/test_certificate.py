@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 import numpy as np
 
-import mpsafe as M
+import lbn_mpsafe as M
 
 TOL = 0.02
 

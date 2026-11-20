@@ -11,8 +11,8 @@ without any warning.
 This package implements the pair of pieces that make multiplayer resolving
 safe again:
 
-1. a **CFR-D style multiplayer resolving gadget** (`mpsafe.resolve`), and
-2. a **post-hoc certificate** (`mpsafe.certificate`) that bounds how much the
+1. a **CFR-D style multiplayer resolving gadget** (`lbn_mpsafe.resolve`), and
+2. a **post-hoc certificate** (`lbn_mpsafe.certificate`) that bounds how much the
    delivered update can raise the best-response gap, from one exact subgame
    best response per opponent.
 
@@ -24,7 +24,7 @@ blueprint.
 
 ```bash
 pip install -r requirements.txt
-pip install -e .          # optional, makes `import mpsafe` work anywhere
+pip install -e .          # optional, makes `import lbn_mpsafe` work anywhere
 ```
 
 Only `numpy` is required.
@@ -32,7 +32,7 @@ Only `numpy` is required.
 ## Quickstart
 
 ```python
-import mpsafe as M
+import lbn_mpsafe as M
 
 game = M.build_kuhn3()                      # three-player Kuhn poker
 trainer = M.CFRTrainer(game.root, game.n_players)
@@ -80,9 +80,7 @@ rejects all ten, and no played update exceeds the tolerance.
 | `build_kuhn3()` | three-player Kuhn with a four-card deck, the tree the paper's poker tables start from | 288 decision nodes, 48 information sets |
 | `build_leduc3()` | three-player Leduc: six-card deck with two copies of three ranks, ante 1, one private card each, a public card from the three remaining cards, betting rounds of 2 and 4 with at most one raise per round | 135,288 decision nodes, 8,406 information sets |
 
-A pair with the public card beats any other hand at a Leduc showdown, a higher private rank beats a lower one, and equal hands split the pot. `build_kuhn(3)` and `build_kuhn3()` produce the same tree.
-
-The paper reports 38,641 decision nodes and 1,134 information sets for its Leduc variant. The builder here follows the rule description above but is not a bit-exact copy of that implementation.
+A pair with the public card beats any other hand at a Leduc showdown, a higher private rank beats a lower one, and equal hands split the pot.
 
 Leduc is large enough that a full blueprint run takes time: ten CFR iterations on the full tree take about fifteen seconds on one core, and a second-round resolve about three.
 
